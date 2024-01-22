@@ -1,27 +1,18 @@
-# Use an official Rust image as the base image
-FROM rust:latest
+FROM rust:latest AS build
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the project files into the container
-COPY / /app
+COPY . /app
 
-# Remove all existing remotes
-RUN git remote | xargs -L1 git remote remove
-
-# Add a new HTTPS GitHub remote
-RUN git remote add origin https://github.com/rainshowerLabs/blutgang.git
-
-# Update the repository (pull the latest changes)
-RUN git pull origin master
-
-RUN pwd
-
-RUN ls -la
-
-# Install libssl-dev
 RUN apt-get update && apt-get install -y libssl-dev
+RUN cargo build --release
 
-# Build and run the Rust project
-CMD ["cargo", "run", "--profile", "maxperf", "--", "-c", "config.toml"]
+
+FROM debian:bookworm
+
+RUN mkdir /app
+RUN apt-get update && apt-get install -y openssl ca-certificates
+COPY --from=build /app/target/release/blutgang /app/blutgang
+COPY --from=build /app/example_config.toml /app/config.toml
+WORKDIR /app
+CMD ["./blutgang", "-c", "config.toml"]
